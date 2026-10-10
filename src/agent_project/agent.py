@@ -1,4 +1,4 @@
-"""Bounded agent execution loop with token accounting and audit trace logging."""
+"""Bounded agent loop implementing tool execution and termination safeguards."""
 
 from __future__ import annotations
 import json
@@ -6,79 +6,67 @@ import os
 from pathlib import Path
 import time
 from typing import Any, Dict, List
+from dotenv import load_dotenv
 from openai import OpenAI
 
-from tools import TOOL_DEFINITIONS, TOOL_REGISTRY
+from agent_project.tools import TOOL_DEFINITIONS, TOOL_REGISTRY
+from agent_project.tracing import calculate_cost, init_trace_file, record_step
 
-MODEL_NAME = "gpt-4o-mini"
-MAX_STEPS = 6
-TRACE_FILE = Path("trace.jsonl")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
-# Cost constants per 1M tokens (USD)
-INPUT_COST_PER_M = 0.15
-OUTPUT_COST_PER_M = 0.60
+API_KEY = os.getenv("OPENAI_API_KEY", "mock-key")
+BASE_URL = os.getenv("OPENAI_BASE_URL")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 
-SYSTEM_PROMPT = """You are MacroTrack: a precise, autonomous nutrition logging agent.
-Core operational directives:
-1. Language requirement: Communicate with the user EXCLUSIVELY in Polish. Keep tone natural, concise, and professional.
-2. Step 1: Always check the daily log first using 'read_daily_log' to retrieve prior meals and cumulative totals.
-3. Step 2: Look up food items in the local database using 'lookup_local_food'.
-4. Step 3 (Fallback): If an item is not found locally, query the external API via 'query_open_food_facts'. If found in the API, cache it using 'cache_food_item'.
-5. Step 4: Accurately calculate nutritional values based on user-provided portion sizes.
-6. Step 5: Append the new meal to 'meals' and mathematically accumulate all macronutrients into 'daily_totals'. Save the state with 'save_daily_log'.
-7. Step 6: Conclude with a clear Polish summary detailing:
-   - Co zostało dodane do posiłku (składniki, gramatura, makro),
-   - Nowy łączny bilans dnia (kalorie, białko, tłuszcze, węglowodany)."""
+MAX_STEPS = 5
 
-
-def calculate_cost(prompt_tokens: int, completion_tokens: int) -> float:
-    """Calculate token cost estimate in USD."""
-    in_cost = (prompt_tokens / 1_000_000) * INPUT_COST_PER_M
-    out_cost = (completion_tokens / 1_000_000) * OUTPUT_COST_PER_M
-    return round(in_cost + out_cost, 6)
-
-
-def record_trace(entry: Dict[str, Any]) -> None:
-    """Append a step record into the JSONL trace file."""
-    with open(TRACE_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+SYSTEM_PROMPT = """You are MacroTrack: a nutritional inspection agent.
+Rules:
+1. Always respond to the user in Polish.
+2. Read the daily log first with 'read_daily_log' to get previous meal records and targets.
+3. Look up all requested ingredients using 'lookup_food_item'.
+4. Calculate proportional macro values for each food item according to specified weights.
+5. In your final response:
+   - Podsumuj wartości dodawanego posiłku (kcal, białko, tłuszcze, węglowodany, cukry, sól).
+   - Przedstaw nowy łączny bilans dnia (poprzednie posiłki + nowy).
+   - Wskaż, ile kalorii pozostało do zrealizowania dziennego celu (lub o ile cel został przekroczony)."""
 
 
 def execute_tool_call(tool_name: str, raw_args: str) -> Dict[str, Any]:
-    """Execute a tool function from the registry with error handling."""
+    """Execute a registered read-only tool with error handling."""
     if tool_name not in TOOL_REGISTRY:
-        return {"error": f"Tool '{tool_name}' is not registered."}
+        return {"error": f"Narzędzie '{tool_name}' nie istnieje."}
 
     try:
         args = json.loads(raw_args) if raw_args else {}
     except json.JSONDecodeError as err:
-        return {"error": f"Invalid JSON arguments: {str(err)}"}
+        return {"error": f"Błąd parsowania argumentów: {str(err)}"}
 
     try:
         result = TOOL_REGISTRY[tool_name](**args)
         return {"result": result}
     except Exception as exc:
-        return {"error": f"Tool execution failed: {str(exc)}"}
+        return {"error": f"Błąd wykonania narzędzia: {str(exc)}"}
 
 
 def run_agent_loop(user_query: str) -> str:
     """Run the bounded ReAct cycle."""
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "mock-key"))
+    init_trace_file()
 
-    if TRACE_FILE.exists():
-        TRACE_FILE.unlink()
+    client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
     messages: List[Dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_query},
     ]
 
-    print(f"[Agent Loop] Initiated for input: \"{user_query}\"")
-    print(f"[Agent Loop] Bounded limit: {MAX_STEPS} steps\n" + "-" * 50)
+    print(f"[Agent] Zapytanie: {user_query}")
+    print(f"[Agent] Maksymalny limit kroków: {MAX_STEPS}\n" + "-" * 50)
 
     for step in range(1, MAX_STEPS + 1):
-        step_start_time = time.time()
-        print(f"\n[Step {step}/{MAX_STEPS}] Evaluating next action...")
+        step_start = time.time()
+        print(f"\n[Krok {step}/{MAX_STEPS}] Model analizuje stan...")
 
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -87,9 +75,8 @@ def run_agent_loop(user_query: str) -> str:
             tool_choice="auto",
         )
 
-        delay = round(time.time() - step_start_time, 3)
-        choice = response.choices[0]
-        message = choice.message
+        delay = round(time.time() - step_start, 3)
+        message = response.choices[0].message
         usage = response.usage
 
         prompt_tokens = usage.prompt_tokens if usage else 0
@@ -112,21 +99,21 @@ def run_agent_loop(user_query: str) -> str:
             },
         }
 
-        # Terminal state reached: model produced the final Polish answer
+        # Warunek stopu 1: Model wygenerował ostateczną odpowiedź (koniec zadania)
         if not message.tool_calls:
-            print(f"[Step {step}] Terminal goal reached.")
+            print(f"[Krok {step}] Cel osiągnięty – model zakończył pętlę.")
             trace_entry["status"] = "COMPLETED"
-            record_trace(trace_entry)
+            record_step(trace_entry)
             return message.content or "Brak podsumowania."
 
-        # Intermediate state: execute tool calls
+        # Wykonanie narzędzi i zwrot wyników do modelu
         messages.append(message)
         trace_entry["tool_executions"] = []
 
         for call in message.tool_calls:
             fn_name = call.function.name
             fn_args = call.function.arguments
-            print(f"  -> Invoking tool: {fn_name}({fn_args})")
+            print(f"  -> Wywołanie narzędzia: {fn_name}({fn_args})")
 
             tool_output = execute_tool_call(fn_name, fn_args)
 
@@ -143,11 +130,11 @@ def run_agent_loop(user_query: str) -> str:
             })
 
         trace_entry["status"] = "IN_PROGRESS"
-        record_trace(trace_entry)
+        record_step(trace_entry)
 
-    # Step limit guardrail
-    fallback_message = "Osiągnięto maksymalny limit kroków agenta bez zakończenia operacji."
-    record_trace({
+    # Warunek stopu 2: Osiągnięcie limitu kroków
+    fallback_message = f"Zatrzymano: osiągnięto limit {MAX_STEPS} kroków bez finalizacji."
+    record_step({
         "step": MAX_STEPS + 1,
         "status": "STOPPED_MAX_STEPS",
         "message": fallback_message,
@@ -156,11 +143,12 @@ def run_agent_loop(user_query: str) -> str:
 
 
 if __name__ == "__main__":
-    sample_prompt = (
-        "Dziś jest 10-10-2026. Na obiad wpadło: 200g piersi z kurczaka, "
-        "80g ryżu basmati oraz 150g skyru naturalnego. Zaktualizuj mój bilans."
+    prompt = (
+        "Dziś jest 10-10-2026. Zjadłem właśnie 200g piersi z kurczaka i 150g skyru naturalnego. "
+        "Sprawdź co już jadłem, wyszukaj wartości i podaj zaktualizowany bilans oraz ile kalorii "
+        "zostało mi do dziennego limitu."
     )
-    result = run_agent_loop(sample_prompt)
+    result = run_agent_loop(prompt)
     print("\n" + "=" * 50)
-    print("ODPOWIEDŹ DLA UŻYTKOWNIKA:\n")
+    print("WYNIK KOŃCOWY DLA UŻYTKOWNIKA:\n")
     print(result)

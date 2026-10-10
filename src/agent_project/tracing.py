@@ -1,30 +1,35 @@
-"""Small JSON Lines trace helper with basic secret redaction."""
+"""Execution tracer for recording agent decisions, delays, and token costs."""
 
+from __future__ import annotations
 import json
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+import time
+from typing import Any, Dict
 
-_SECRET_FIELDS = {"api_key", "authorization", "openrouter_api_key", "token"}
+ROOT_DIR = Path(__file__).resolve().parents[2]
+TRACES_DIR = ROOT_DIR / "traces"
+TRACE_FILE = TRACES_DIR / "trace.jsonl"
 
-
-def _redact(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            key: "[REDACTED]" if key.lower() in _SECRET_FIELDS else _redact(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact(item) for item in value]
-    return value
+INPUT_COST_PER_M = 0.15
+OUTPUT_COST_PER_M = 0.60
 
 
-def append_trace(path: Path, event: str, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    record = {
-        "timestamp": datetime.now(UTC).isoformat(),
-        "event": event,
-        "payload": _redact(payload),
-    }
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+def init_trace_file() -> None:
+    """Ensure traces directory exists and clear previous run trace."""
+    TRACES_DIR.mkdir(parents=True, exist_ok=True)
+    if TRACE_FILE.exists():
+        TRACE_FILE.unlink()
+
+
+def calculate_cost(prompt_tokens: int, completion_tokens: int) -> float:
+    """Calculate approximate USD cost for token usage."""
+    in_cost = (prompt_tokens / 1_000_000) * INPUT_COST_PER_M
+    out_cost = (completion_tokens / 1_000_000) * OUTPUT_COST_PER_M
+    return round(in_cost + out_cost, 6)
+
+
+def record_step(entry: Dict[str, Any]) -> None:
+    """Append a single decision step into trace.jsonl."""
+    TRACES_DIR.mkdir(parents=True, exist_ok=True)
+    with open(TRACE_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
