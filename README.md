@@ -34,7 +34,7 @@ Projekt uznaje się za poprawnie wykonany, gdy pojedyncze uruchomienie spełnia 
 
 ## 4. Architektura pętli decyzyjnej
 
-Pętla działa w schemacie ReAct (Reason $\rightarrow$ Act $\rightarrow$ Observe):
+Pętla działa w schemacie ReAct (Reason --> Act --> Observe):
 
 ```text
 [User Prompt]
