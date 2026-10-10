@@ -1,0 +1,56 @@
+{
+  "date": "10-10-2026",
+  "meals": [
+    {
+      "meal_name": "Obiad / Fast Food",
+      "items": [
+        {
+          "name": "Big Mac (McDonald's)",
+          "amount": 1,
+          "unit": "sztuka (215g)",
+          "calories": 509.0,
+          "protein": 27.0,
+          "fats": 26.0,
+          "carbs": 42.0,
+          "sugars": 8.0,
+          "salt": 2.3
+        }
+      ]
+    },
+    {
+      "meal_name": "Przekąska",
+      "items": [
+        {
+          "name": "Ciastka Bonitki z kawałkami czekolady (Biedronka)",
+          "amount": 60,
+          "unit": "g",
+          "calories": 306.0,
+          "protein": 3.6,
+          "fats": 15.0,
+          "carbs": 38.4,
+          "sugars": 21.0,
+          "salt": 0.42
+        },
+        {
+          "name": "Lay's Paprykowe",
+          "amount": 40,
+          "unit": "g",
+          "calories": 212.0,
+          "protein": 2.4,
+          "fats": 13.2,
+          "carbs": 20.8,
+          "sugars": 1.6,
+          "salt": 0.68
+        }
+      ]
+    }
+  ],
+  "daily_totals": {
+    "calories": 1027.0,
+    "protein": 33.0,
+    "fats": 54.2,
+    "carbs": 101.2,
+    "sugars": 30.6,
+    "salt": 3.4
+  }
+}
