@@ -6,7 +6,9 @@
     "calories": 165.0,
     "protein": 31.0,
     "fats": 3.6,
-    "carbs": 0.0
+    "carbs": 0.0,
+    "sugars": 0.0,
+    "salt": 0.15
   },
   {
     "id": "prod_002",
@@ -15,7 +17,9 @@
     "calories": 350.0,
     "protein": 8.5,
     "fats": 0.9,
-    "carbs": 77.0
+    "carbs": 77.0,
+    "sugars": 0.2,
+    "salt": 0.01
   },
   {
     "id": "prod_003",
@@ -24,15 +28,8 @@
     "calories": 88.0,
     "protein": 0.0,
     "fats": 10.0,
-    "carbs": 0.0
-  },
-  {
-    "id": "prod_004",
-    "name": "jajko",
-    "unit": "sztuka",
-    "calories": 78.0,
-    "protein": 6.3,
-    "fats": 5.3,
-    "carbs": 0.6
+    "carbs": 0.0,
+    "sugars": 0.0,
+    "salt": 0.0
   }
 ]
