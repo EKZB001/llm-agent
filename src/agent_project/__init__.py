@@ -1,12 +1,12 @@
-"""Student agent project."""
+"""MacroTrack agent project."""
 
-from agent_project.llm import MockClient, ModelClient, OpenRouterClient, image_part
-from agent_project.tracing import append_trace
+from agent_project.agent import run_agent_loop
+from agent_project.tools import TOOL_DEFINITIONS, TOOL_REGISTRY
+from agent_project.tracing import record_step
 
 __all__ = [
-    "MockClient",
-    "ModelClient",
-    "OpenRouterClient",
-    "append_trace",
-    "image_part",
+    "run_agent_loop",
+    "TOOL_DEFINITIONS",
+    "TOOL_REGISTRY",
+    "record_step",
 ]

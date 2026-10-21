@@ -7,8 +7,9 @@ from typing import Any, Dict, List
 import urllib.parse
 import urllib.request
 
-DATA_DIR = Path(__file__).parent / "data"
-LOGS_DIR = Path(__file__).parent / "logs"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = PROJECT_ROOT / "data"
+LOGS_DIR = PROJECT_ROOT / "logs"
 
 
 def read_daily_log(date_str: str) -> Dict[str, Any]:
