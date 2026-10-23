@@ -1,44 +1,89 @@
 {
-  "date": "23-10-2026",
   "meals": [
     {
-      "name": "Pierś z kurczaka z ryżem basmati",
-      "calories": 505.0,
       "protein": 66.25,
       "fats": 7.65,
-      "carbs": 38.5,
       "sugars": 0.1,
-      "salt": 0.305,
+      "carbs": 38.5,
+      "name": "Pierś z kurczaka z ryżem basmati",
       "items": [
         {
-          "name": "pierś z kurczaka",
-          "amount_g": 200,
-          "calories": 330.0,
-          "protein": 62.0,
           "fats": 7.2,
-          "carbs": 0.0,
-          "sugars": 0.0,
-          "salt": 0.3
+          "calories": 330,
+          "protein": 62,
+          "amount_g": 200,
+          "carbs": 0,
+          "salt": 0.3,
+          "name": "pierś z kurczaka",
+          "sugars": 0
         },
         {
-          "name": "ryż basmati",
-          "amount_g": 50,
-          "calories": 175.0,
           "protein": 4.25,
+          "amount_g": 50,
           "fats": 0.45,
+          "name": "ryż basmati",
           "carbs": 38.5,
-          "sugars": 0.1,
-          "salt": 0.005
+          "salt": 0.005,
+          "calories": 175,
+          "sugars": 0.1
+        }
+      ],
+      "meals": [],
+      "salt": 0.305,
+      "calories": 505
+    },
+    {
+      "fats": 40.25,
+      "meals": [],
+      "name": "Lody Nutella w kubku",
+      "calories": 717.6,
+      "carbs": 76.36,
+      "protein": 11.04,
+      "salt": 0.506,
+      "sugars": 72.45,
+      "items": [
+        {
+          "carbs": 76.36,
+          "sugars": 72.45,
+          "protein": 11.04,
+          "calories": 717.6,
+          "fats": 40.25,
+          "amount_g": 230,
+          "salt": 0.506,
+          "name": "lody nutella"
         }
       ]
+    },
+    {
+      "calories": 99,
+      "meals": [],
+      "sugars": 5.7,
+      "salt": 0.165,
+      "carbs": 5.7,
+      "items": [
+        {
+          "carbs": 5.7,
+          "sugars": 5.7,
+          "fats": 0,
+          "calories": 99,
+          "salt": 0.165,
+          "name": "skyr naturalny",
+          "protein": 18,
+          "amount_g": 150
+        }
+      ],
+      "protein": 18,
+      "fats": 0,
+      "name": "Skyr naturalny"
     }
   ],
   "daily_totals": {
-    "calories": 505.0,
-    "protein": 66.25,
-    "fats": 7.65,
-    "carbs": 38.5,
-    "sugars": 0.1,
-    "salt": 0.305
-  }
+    "carbs": 120.56,
+    "fats": 47.9,
+    "salt": 0.976,
+    "sugars": 78.25,
+    "calories": 1321.6,
+    "protein": 95.29
+  },
+  "date": "23-10-2026"
 }

@@ -31,5 +31,27 @@
     "carbs": 0.0,
     "sugars": 0.0,
     "salt": 0.0
+  },
+  {
+    "id": "prod_004",
+    "name": "lody nutella",
+    "unit": "100g",
+    "calories": 312.0,
+    "protein": 4.8,
+    "fats": 17.5,
+    "carbs": 33.2,
+    "sugars": 31.5,
+    "salt": 0.22
+  },
+  {
+    "id": "prod_005",
+    "name": "skyr naturalny",
+    "unit": "100g",
+    "calories": 66.0,
+    "protein": 12.0,
+    "fats": 0.0,
+    "carbs": 3.8,
+    "sugars": 3.8,
+    "salt": 0.11
   }
 ]

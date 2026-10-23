@@ -123,15 +123,22 @@ def cache_food_item(item_data: Dict[str, Any]) -> Dict[str, Any]:
         with open(filepath, "r", encoding="utf-8") as f:
             db = json.load(f)
 
+    clean_name = item_data["name"].strip().lower()
+    for existing in db:
+        if existing.get("name", "").strip().lower() == clean_name:
+            return {"status": "already_cached", "cached_item": existing}
+
     new_id = f"prod_{len(db) + 1:03d}"
     cached_record = {
         "id": new_id,
-        "name": item_data["name"].lower(),
+        "name": clean_name,
         "unit": item_data.get("unit", "100g"),
         "calories": round(float(item_data["calories"]), 1),
         "protein": round(float(item_data["protein"]), 1),
         "fats": round(float(item_data["fats"]), 1),
         "carbs": round(float(item_data["carbs"]), 1),
+        "sugars": round(float(item_data.get("sugars", 0.0)), 1),
+        "salt": round(float(item_data.get("salt", 0.0)), 2),
     }
 
     db.append(cached_record)
@@ -225,6 +232,8 @@ TOOL_DEFINITIONS = [
                             "protein": {"type": "number"},
                             "fats": {"type": "number"},
                             "carbs": {"type": "number"},
+                            "sugars": {"type": "number"},
+                            "salt": {"type": "number"},
                         },
                         "required": ["name", "unit", "calories", "protein", "fats", "carbs"],
                     }

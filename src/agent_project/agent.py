@@ -27,7 +27,7 @@ from agent_project.tracing import calculate_cost, init_trace_file, record_step
 
 API_KEY = os.getenv("MODEL_API_KEY") or os.getenv("OPENAI_API_KEY") or "mock-key"
 BASE_URL = os.getenv("MODEL_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-MODEL_NAME = os.getenv("MODEL_NAME", "gemini-3.6-flash")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-3.5-flash-lite")
 
 MAX_STEPS = 7
 
@@ -42,9 +42,10 @@ Rules:
 2. Unless the user explicitly specifies another date, assume the target date is today ({today_str}).
 3. Read the daily log first with 'read_daily_log' using the target date (DD-MM-YYYY) to get previous meal records and targets.
 4. Look up all requested ingredients using 'lookup_local_food'.
-5. If an ingredient is missing locally, check 'query_open_food_facts' once. Inspect the candidate products returned from the API and select the best matching variant (checking brand, flavor, type). If none match or API fails, estimate standard nutritional values for the plain item (e.g., skyr naturalny: ~65 kcal, 12g protein per 100g) and proceed without endless searching.
-6. Calculate proportional macro values for each food item according to specified weights.
-7. In your final response:
+5. If an ingredient is missing locally, check 'query_open_food_facts' once. Inspect the candidate products returned from the API and select the best matching variant (checking brand, flavor, type). If none match or API fails, estimate standard nutritional values for the item and proceed without endless searching.
+6. Whenever an ingredient is resolved that was not in the local database, cache it using 'cache_food_item' so it becomes saved in 'nutrition_db.json' for future use.
+7. Calculate proportional macro values for each food item according to specified weights, and persist the updated daily meal log with 'save_daily_log'.
+8. In your final response:
    - Podsumuj wartości dodawanego posiłku (kcal, białko, tłuszcze, węglowodany, cukry, sól).
    - Przedstaw nowy łączny bilans dnia (poprzednie posiłki + nowy).
    - Wskaż, ile kalorii pozostało do zrealizowania dziennego celu (lub o ile cel został przekroczony)."""
@@ -70,14 +71,16 @@ def execute_tool_call(tool_name: str, raw_args: str) -> Dict[str, Any]:
 def _call_model_with_retry(client: OpenAI, **kwargs: Any) -> Any:
     """Invoke chat completion with retries for transient 503/429 errors."""
     last_err: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(4):
         try:
             return client.chat.completions.create(**kwargs)
         except Exception as exc:
             last_err = exc
             err_str = str(exc)
             if "503" in err_str or "429" in err_str:
-                time.sleep(2 * (attempt + 1))
+                wait_time = 15 if "429" in err_str else 3 * (attempt + 1)
+                print(f"  [API Retry] Limit zapytań / przeciążenie API. Oczekiwanie {wait_time}s (próba {attempt + 1}/4)...")
+                time.sleep(wait_time)
                 continue
             raise
     raise last_err or RuntimeError("Nieznany błąd wywołania API.")

@@ -103,7 +103,7 @@ Create a `.env` file in the root directory (based on `.env.example`):
 ```env
 MODEL_API_KEY=your_google_ai_studio_api_key
 MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-MODEL_NAME=gemini-3.6-flash
+MODEL_NAME=gemini-3.5-flash-lite
 MODEL_PROVIDER=google-ai-studio
 ```
 
