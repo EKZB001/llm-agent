@@ -54,11 +54,11 @@ def lookup_local_food(query: str) -> List[Dict[str, Any]]:
 
 
 def query_open_food_facts(product_name: str) -> Dict[str, Any]:
-    """Query Open Food Facts API for macros, sugars, salt, and serving size."""
+    """Query Open Food Facts API for up to 5 matching products with macros, sugars, salt, and serving size."""
     encoded_query = urllib.parse.quote(product_name.strip())
     url = (
         f"https://pl.openfoodfacts.org/cgi/search.pl?"
-        f"search_terms={encoded_query}&search_simple=1&action=process&json=1&page_size=1"
+        f"search_terms={encoded_query}&search_simple=1&action=process&json=1&page_size=5"
     )
 
     req = urllib.request.Request(
@@ -74,32 +74,40 @@ def query_open_food_facts(product_name: str) -> Dict[str, Any]:
         if not products:
             return {
                 "found": False,
-                "message": f"Nie znaleziono produktu '{product_name}' w bazie.",
+                "message": f"Nie znaleziono produktu '{product_name}' w bazie Open Food Facts.",
             }
 
-        first_match = products[0]
-        nutriments = first_match.get("nutriments", {})
+        candidates: List[Dict[str, Any]] = []
+        for p in products[:5]:
+            nutriments = p.get("nutriments", {})
+            raw_name = p.get("product_name") or p.get("product_name_pl") or product_name
+            brand = p.get("brands", "").strip()
+            display_name = f"{brand} - {raw_name}".strip(" -") if brand else raw_name
 
-        # Obsługa wagi porcji (np. 1 burger = 215g, 1 ciastko = 25g)
-        serving_weight = None
-        if "serving_quantity" in first_match:
-            try:
-                serving_weight = float(first_match["serving_quantity"])
-            except (ValueError, TypeError):
-                serving_weight = None
+            serving_weight = None
+            if "serving_quantity" in p:
+                try:
+                    serving_weight = float(p["serving_quantity"])
+                except (ValueError, TypeError):
+                    serving_weight = None
+
+            candidates.append({
+                "name": display_name,
+                "unit": "100g",
+                "serving_weight_g": serving_weight,
+                "calories": round(float(nutriments.get("energy-kcal_100g", 0.0)), 1),
+                "protein": round(float(nutriments.get("proteins_100g", 0.0)), 1),
+                "fats": round(float(nutriments.get("fat_100g", 0.0)), 1),
+                "carbs": round(float(nutriments.get("carbohydrates_100g", 0.0)), 1),
+                "sugars": round(float(nutriments.get("sugars_100g", 0.0)), 1),
+                "salt": round(float(nutriments.get("salt_100g", 0.0)), 2),
+                "source": "Open Food Facts API",
+            })
 
         return {
             "found": True,
-            "name": first_match.get("product_name", product_name),
-            "unit": "100g",
-            "serving_weight_g": serving_weight,
-            "calories": round(float(nutriments.get("energy-kcal_100g", 0.0)), 1),
-            "protein": round(float(nutriments.get("proteins_100g", 0.0)), 1),
-            "fats": round(float(nutriments.get("fat_100g", 0.0)), 1),
-            "carbs": round(float(nutriments.get("carbohydrates_100g", 0.0)), 1),
-            "sugars": round(float(nutriments.get("sugars_100g", 0.0)), 1),
-            "salt": round(float(nutriments.get("salt_100g", 0.0)), 2),
-            "source": "Open Food Facts API",
+            "count": len(candidates),
+            "candidates": candidates,
         }
     except Exception as exc:
         return {"found": False, "error": f"Błąd zapytania HTTP: {str(exc)}"}
@@ -186,7 +194,7 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "query_open_food_facts",
-            "description": "Search the public Open Food Facts database when an item is missing locally.",
+            "description": "Search the public Open Food Facts database when an item is missing locally. Returns up to 5 matching candidates with brands and nutritional values per 100g.",
             "parameters": {
                 "type": "object",
                 "properties": {

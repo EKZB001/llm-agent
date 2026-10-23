@@ -71,3 +71,51 @@ def test_record_step(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     rec2 = json.loads(lines[1])
     assert rec1["step"] == 1
     assert rec2["status"] == "COMPLETED"
+
+    # Verify timestamped history file was also written
+    history_files = list((tmp_path / "history").glob("trace_*.jsonl"))
+    assert len(history_files) == 1
+    hist_lines = history_files[0].read_text(encoding="utf-8").strip().splitlines()
+    assert len(hist_lines) == 2
+
+
+def test_query_open_food_facts_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agent_project.tools import query_open_food_facts
+
+    mock_payload = {
+        "products": [
+            {
+                "product_name": "Skyr Naturalny",
+                "brands": "Piątnica",
+                "serving_quantity": 150,
+                "nutriments": {
+                    "energy-kcal_100g": 65,
+                    "proteins_100g": 12,
+                    "fat_100g": 0.2,
+                    "carbohydrates_100g": 4,
+                    "sugars_100g": 4,
+                    "salt_100g": 0.1,
+                },
+            }
+        ]
+    }
+
+    class MockResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self):
+            return json.dumps(mock_payload).encode("utf-8")
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout: MockResponse())
+
+    res = query_open_food_facts("skyr")
+    assert res["found"] is True
+    assert res["count"] == 1
+    assert "candidates" in res
+    assert res["candidates"][0]["name"] == "Piątnica - Skyr Naturalny"
+    assert res["candidates"][0]["calories"] == 65.0
+    assert res["candidates"][0]["serving_weight_g"] == 150.0

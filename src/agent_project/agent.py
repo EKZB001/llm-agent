@@ -14,6 +14,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
 from agent_project.tools import TOOL_DEFINITIONS, TOOL_REGISTRY
@@ -36,7 +42,7 @@ Rules:
 2. Unless the user explicitly specifies another date, assume the target date is today ({today_str}).
 3. Read the daily log first with 'read_daily_log' using the target date (DD-MM-YYYY) to get previous meal records and targets.
 4. Look up all requested ingredients using 'lookup_local_food'.
-5. If an ingredient is missing locally, check 'query_open_food_facts' once. If not found or API returns only flavored variants, use standard nutritional estimates for the plain item (e.g., skyr naturalny: ~65 kcal, 12g protein per 100g) and proceed without endless searching.
+5. If an ingredient is missing locally, check 'query_open_food_facts' once. Inspect the candidate products returned from the API and select the best matching variant (checking brand, flavor, type). If none match or API fails, estimate standard nutritional values for the plain item (e.g., skyr naturalny: ~65 kcal, 12g protein per 100g) and proceed without endless searching.
 6. Calculate proportional macro values for each food item according to specified weights.
 7. In your final response:
    - Podsumuj wartości dodawanego posiłku (kcal, białko, tłuszcze, węglowodany, cukry, sól).
