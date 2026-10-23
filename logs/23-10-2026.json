@@ -1,0 +1,44 @@
+{
+  "date": "23-10-2026",
+  "meals": [
+    {
+      "name": "Pierś z kurczaka z ryżem basmati",
+      "calories": 505.0,
+      "protein": 66.25,
+      "fats": 7.65,
+      "carbs": 38.5,
+      "sugars": 0.1,
+      "salt": 0.305,
+      "items": [
+        {
+          "name": "pierś z kurczaka",
+          "amount_g": 200,
+          "calories": 330.0,
+          "protein": 62.0,
+          "fats": 7.2,
+          "carbs": 0.0,
+          "sugars": 0.0,
+          "salt": 0.3
+        },
+        {
+          "name": "ryż basmati",
+          "amount_g": 50,
+          "calories": 175.0,
+          "protein": 4.25,
+          "fats": 0.45,
+          "carbs": 38.5,
+          "sugars": 0.1,
+          "salt": 0.005
+        }
+      ]
+    }
+  ],
+  "daily_totals": {
+    "calories": 505.0,
+    "protein": 66.25,
+    "fats": 7.65,
+    "carbs": 38.5,
+    "sugars": 0.1,
+    "salt": 0.305
+  }
+}
