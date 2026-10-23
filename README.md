@@ -69,3 +69,74 @@ The agent follows the ReAct pattern (Reason --> Act --> Observe):
       │
       ▼
 [Final Response] (Meal breakdown + updated daily totals for the user)
+```
+
+---
+
+## 5. Setup & Usage Instructions
+
+### Prerequisites
+* Python 3.12+ (or 3.14)
+* Git
+
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/EKZB001/llm-agent.git
+   cd llm-agent
+   ```
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   # Windows (PowerShell):
+   .\.venv\Scripts\Activate.ps1
+   # Linux/macOS:
+   source .venv/bin/activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install openai python-dotenv pydantic pytest
+   ```
+
+### Configuration
+Create a `.env` file in the root directory (based on `.env.example`):
+```env
+MODEL_API_KEY=your_google_ai_studio_api_key
+MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+MODEL_NAME=gemini-3.6-flash
+MODEL_PROVIDER=google-ai-studio
+```
+
+### Running the Agent
+* **Interactive mode (terminal prompt):**
+  ```bash
+  python src/agent_project/agent.py
+  ```
+* **Command-line argument mode:**
+  ```bash
+  python src/agent_project/agent.py "Zjadłem 200g piersi z kurczaka i 50g ryżu basmati"
+  ```
+
+### Running Tests
+Execute repeatable unit tests with mocks (no API key or internet required):
+```bash
+python -m pytest
+```
+
+---
+
+## 6. Checkpoint Deliverables (Stage 1 Demonstration)
+
+All requirements specified for the Stage 1 Checkpoint are verified and reproducible:
+
+| Requirement | Implementation & Location |
+| :--- | :--- |
+| **Project Description** | Sections 1–4 above (Problem, Persona, DoD, Architecture). |
+| **Runnable Loop** | [`src/agent_project/agent.py`](src/agent_project/agent.py) with bounded steps (`MAX_STEPS = 7`). |
+| **Checks for Tool Requests** | Implemented in `execute_tool_call` (validates function registry, argument decoding, and runtime errors). |
+| **Repeatable Mock Tests** | 10 unit tests in [`tests/test_agent.py`](tests/test_agent.py) covering tools, error safeguards, and trace formatting. |
+| **Setup Instructions** | Section 5 above. |
+| **Required Trace Metadata** | Every JSONL record includes: `model_provider`, `model`, `tokens`, `estimated_cost_usd`, `response_time_seconds`. |
+| **Successful Run Trace** | [`traces/successful_run.jsonl`](traces/successful_run.jsonl) – Goal achieved, meals resolved & saved (`status: COMPLETED`). |
+| **Unsuccessful Run Trace** | [`traces/unsuccessful_run.jsonl`](traces/unsuccessful_run.jsonl) – Step limit safeguard triggered (`status: STOPPED_MAX_STEPS`). |
+| **Active Latest Trace** | [`traces/trace.jsonl`](traces/trace.jsonl) – Most recent execution log. |

@@ -121,6 +121,9 @@ def run_agent_loop(user_query: str) -> str:
         trace_entry: Dict[str, Any] = {
             "step": step,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "model_provider": os.getenv("MODEL_PROVIDER", "google-ai-studio"),
+            "model": MODEL_NAME,
+            "response_time_seconds": delay,
             "delay_seconds": delay,
             "tokens": {
                 "prompt": prompt_tokens,
@@ -171,6 +174,9 @@ def run_agent_loop(user_query: str) -> str:
     fallback_message = f"Zatrzymano: osiągnięto limit {MAX_STEPS} kroków bez finalizacji."
     record_step({
         "step": MAX_STEPS + 1,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "model_provider": os.getenv("MODEL_PROVIDER", "google-ai-studio"),
+        "model": MODEL_NAME,
         "status": "STOPPED_MAX_STEPS",
         "message": fallback_message,
     })
