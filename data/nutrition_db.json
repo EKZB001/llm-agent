@@ -53,5 +53,27 @@
     "carbs": 3.8,
     "sugars": 3.8,
     "salt": 0.11
+  },
+  {
+    "id": "prod_006",
+    "name": "udko z kurczaka",
+    "unit": "100g",
+    "calories": 125.0,
+    "protein": 17.8,
+    "fats": 6.0,
+    "carbs": 0.0,
+    "sugars": 0.0,
+    "salt": 0.0
+  },
+  {
+    "id": "prod_007",
+    "name": "ziemniaki",
+    "unit": "100g",
+    "calories": 77.0,
+    "protein": 2.0,
+    "fats": 0.1,
+    "carbs": 17.0,
+    "sugars": 0.8,
+    "salt": 0.0
   }
 ]

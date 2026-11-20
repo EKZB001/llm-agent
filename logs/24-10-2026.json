@@ -1,0 +1,46 @@
+{
+  "meals": [
+    {
+      "items": [
+        {
+          "calories": 385,
+          "salt": 0,
+          "name": "ziemniaki",
+          "fats": 0.5,
+          "protein": 10,
+          "carbs": 85,
+          "amount_g": 500,
+          "sugars": 4
+        },
+        {
+          "carbs": 0,
+          "amount_g": 300,
+          "sugars": 0,
+          "protein": 53.4,
+          "calories": 375,
+          "name": "udko z kurczaka",
+          "salt": 0,
+          "fats": 18
+        }
+      ],
+      "meal_name": "Posiłek 1",
+      "meal_totals": {
+        "protein": 63.4,
+        "sugars": 4,
+        "fats": 18.5,
+        "salt": 0,
+        "carbs": 85,
+        "calories": 760
+      }
+    }
+  ],
+  "daily_totals": {
+    "fats": 18.5,
+    "salt": 0,
+    "calories": 760,
+    "protein": 63.4,
+    "sugars": 4,
+    "carbs": 85
+  },
+  "date": "24-10-2026"
+}
