@@ -1,0 +1,10 @@
+[
+  {
+    "workout_id": "work_001",
+    "date": "20-11-2026",
+    "activity": "bieganie",
+    "duration_minutes": 30,
+    "burned_calories": 375.0,
+    "match_type": "exact_sport_match"
+  }
+]

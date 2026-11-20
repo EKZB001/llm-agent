@@ -1,12 +1,13 @@
-"""Bounded agent loop implementing tool execution and termination safeguards."""
+"""Bounded agent loop implementing tool execution, security policy, and termination safeguards."""
 
+from __future__ import annotations
 from datetime import datetime
 import json
 import os
 from pathlib import Path
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -22,7 +23,8 @@ if sys.platform == "win32":
 
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
-from agent_project.tools import TOOL_DEFINITIONS, TOOL_REGISTRY
+from agent_project.policy import execute_tool_with_policy
+from agent_project.tools import TOOL_DEFINITIONS
 from agent_project.tracing import calculate_cost, init_trace_file, record_step
 
 API_KEY = os.getenv("MODEL_API_KEY") or os.getenv("OPENAI_API_KEY") or "mock-key"
@@ -33,39 +35,54 @@ MAX_STEPS = 7
 
 
 def build_system_prompt() -> str:
-    """Build the system prompt dynamically injecting current system date."""
+    """Build the system prompt dynamically injecting current system date and tool guidelines."""
     today_str = datetime.now().strftime("%d-%m-%Y")
-    return f"""You are MacroTrack: a nutritional inspection agent.
+    return f"""You are MacroTrack: an autonomous nutritional and fitness inspection agent.
 Today's system date is: {today_str}.
-Rules:
+
+Available tool types and operational guidelines:
+1. READ-ONLY tools:
+   - 'read_daily_log': Check previous meal entries and macro totals for target date (DD-MM-YYYY).
+   - 'lookup_local_food': Query local nutrition database for ingredients.
+   - 'query_open_food_facts': Search fallback database if ingredient is not found locally.
+   - 'estimate_burned_calories': Calculate calories burned for a physical activity using MET standards.
+   - 'get_daily_workouts': View all logged exercises and total burned calories for the date.
+
+2. REVERSIBLE WRITE tools:
+   - 'cache_food_item': Save newly resolved product to local database for future reuse.
+   - 'log_meal_entry': Append a new structured meal entry to daily log.
+   - 'log_workout': Record a completed exercise session in workouts log.
+   - 'save_daily_log': Persist full updated daily log.
+
+3. SENSITIVE tools (Strictly guarded by Python security policy):
+   - 'delete_meal_entry': Delete a meal from the daily log by meal_id. Requires explicit human confirmation.
+   - 'clear_daily_log': Reset all meals for the day. Requires explicit human confirmation.
+   * If an action is denied by the user, observe the refusal and adjust your plan gracefully.
+
+Execution Rules:
 1. Always respond to the user in Polish.
-2. Unless the user explicitly specifies another date, assume the target date is today ({today_str}).
-3. Read the daily log first with 'read_daily_log' using the target date (DD-MM-YYYY) to get previous meal records and targets.
-4. Look up all requested ingredients using 'lookup_local_food'.
-5. If an ingredient is missing locally, check 'query_open_food_facts' once. Inspect the candidate products returned from the API and select the best matching variant (checking brand, flavor, type). If none match or API fails, estimate standard nutritional values for the item and proceed without endless searching.
-6. Whenever an ingredient is resolved that was not in the local database, cache it using 'cache_food_item' so it becomes saved in 'nutrition_db.json' for future use.
-7. Calculate proportional macro values for each food item according to specified weights, and persist the updated daily meal log with 'save_daily_log'.
-8. In your final response:
-   - Podsumuj wartości dodawanego posiłku (kcal, białko, tłuszcze, węglowodany, cukry, sól).
-   - Przedstaw nowy łączny bilans dnia (poprzednie posiłki + nowy).
-   - Wskaż, ile kalorii pozostało do zrealizowania dziennego celu (lub o ile cel został przekroczony)."""
+2. Unless user specifies another date, assume target date is today ({today_str}).
+3. Always inspect current state first with 'read_daily_log' before modifying or reporting totals.
+4. If an ingredient is missing, query Open Food Facts or estimate realistic values, and cache it with 'cache_food_item'.
+5. When adding meals, use 'log_meal_entry' or 'save_daily_log'.
+6. If the user asks to delete or clear data, call the corresponding sensitive tool. The Python environment will request human confirmation. If confirmation is denied, inform the user and leave the data unchanged.
+7. In your final response:
+   - Podsumuj operacje (dodane/usunięte posiłki lub treningi).
+   - Przedstaw aktualny bilans dnia (spożyte kalorie, makroskładniki oraz ewentualne spalone kalorie).
+   - Wskaż bilans netto lub realizację dziennego limitu."""
 
 
-def execute_tool_call(tool_name: str, raw_args: str) -> Dict[str, Any]:
-    """Execute a registered read-only tool with error handling."""
-    if tool_name not in TOOL_REGISTRY:
-        return {"error": f"Narzędzie '{tool_name}' nie istnieje."}
-
-    try:
-        args = json.loads(raw_args) if raw_args else {}
-    except json.JSONDecodeError as err:
-        return {"error": f"Błąd parsowania argumentów: {str(err)}"}
-
-    try:
-        result = TOOL_REGISTRY[tool_name](**args)
-        return {"result": result}
-    except Exception as exc:
-        return {"error": f"Błąd wykonania narzędzia: {str(exc)}"}
+def execute_tool_call(
+    tool_name: str,
+    raw_args: str,
+    confirm_handler: Optional[Callable[[str, Dict[str, Any]], bool]] = None,
+) -> Dict[str, Any]:
+    """Execute a registered tool passing through the Python security and validation policy."""
+    return execute_tool_with_policy(
+        tool_name=tool_name,
+        raw_args_str=raw_args,
+        confirm_handler=confirm_handler,
+    )
 
 
 def _call_model_with_retry(client: OpenAI, **kwargs: Any) -> Any:
@@ -86,8 +103,13 @@ def _call_model_with_retry(client: OpenAI, **kwargs: Any) -> Any:
     raise last_err or RuntimeError("Nieznany błąd wywołania API.")
 
 
-def run_agent_loop(user_query: str) -> str:
-    """Run the bounded ReAct cycle."""
+def run_agent_loop(
+    user_query: str,
+    confirm_handler: Optional[Callable[[str, Dict[str, Any]], bool]] = None,
+    custom_tools: Optional[List[Dict[str, Any]]] = None,
+    hub: Optional[Any] = None,
+) -> str:
+    """Run the bounded ReAct cycle with policy protection and JSONL tracing."""
     init_trace_file()
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
@@ -97,6 +119,14 @@ def run_agent_loop(user_query: str) -> str:
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_query},
     ]
+
+    if hub is not None:
+        import anyio
+        tools_to_use = anyio.run(hub.initialize_tools)
+    elif custom_tools is not None:
+        tools_to_use = custom_tools
+    else:
+        tools_to_use = TOOL_DEFINITIONS
 
     print(f"[Agent] Zapytanie: {user_query}")
     print(f"[Agent] Maksymalny limit kroków: {MAX_STEPS}\n" + "-" * 50)
@@ -109,7 +139,7 @@ def run_agent_loop(user_query: str) -> str:
             client,
             model=MODEL_NAME,
             messages=messages,
-            tools=TOOL_DEFINITIONS,
+            tools=tools_to_use,
             tool_choice="auto",
         )
 
@@ -147,16 +177,20 @@ def run_agent_loop(user_query: str) -> str:
             record_step(trace_entry)
             return message.content or "Brak podsumowania."
 
-        # Wykonanie narzędzi i zwrot wyników do modelu
+        # Wykonanie narzędzi pod nadzorem polityki i zwrot wyników do modelu
         messages.append(message)
         trace_entry["tool_executions"] = []
 
         for call in message.tool_calls:
             fn_name = call.function.name
             fn_args = call.function.arguments
-            print(f"  -> Wywołanie narzędzia: {fn_name}({fn_args})")
+            print(f"  -> Żądanie modelu: {fn_name}({fn_args})")
 
-            tool_output = execute_tool_call(fn_name, fn_args)
+            if hub is not None:
+                import anyio
+                tool_output = anyio.run(hub.call_tool, fn_name, fn_args, confirm_handler)
+            else:
+                tool_output = execute_tool_call(fn_name, fn_args, confirm_handler=confirm_handler)
 
             trace_entry["tool_executions"].append({
                 "tool_name": fn_name,
@@ -190,7 +224,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         prompt = " ".join(sys.argv[1:])
     else:
-        print("Wpisz co zjadłeś (lub naciśnij Enter, aby użyć domyślnego prompta):")
+        print("Wpisz zapytanie (lub naciśnij Enter, aby użyć domyślnego):")
         try:
             user_input = input("> ").strip()
         except EOFError:
