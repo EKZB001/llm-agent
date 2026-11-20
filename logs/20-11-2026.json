@@ -1,0 +1,35 @@
+{
+  "date": "20-11-2026",
+  "daily_totals": {
+    "calories": 330.0,
+    "protein": 62.0,
+    "fats": 7.2,
+    "carbs": 0.0,
+    "sugars": 0.0,
+    "salt": 0.3
+  },
+  "meals": [
+    {
+      "meal_id": "meal_1795214864_01",
+      "name": "Pierś z kurczaka",
+      "calories": 330.0,
+      "protein": 62.0,
+      "fats": 7.2,
+      "carbs": 0.0,
+      "sugars": 0.0,
+      "salt": 0.3,
+      "items": [
+        {
+          "name": "pierś z kurczaka",
+          "amount_g": 200.0,
+          "calories": 330.0,
+          "protein": 62.0,
+          "fats": 7.2,
+          "carbs": 0.0,
+          "sugars": 0.0,
+          "salt": 0.3
+        }
+      ]
+    }
+  ]
+}

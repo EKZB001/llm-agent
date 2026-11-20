@@ -140,3 +140,87 @@ All requirements specified for the Stage 1 Checkpoint are verified and reproduci
 | **Successful Run Trace** | [`traces/successful_run.jsonl`](traces/successful_run.jsonl) – Goal achieved, meals resolved & saved (`status: COMPLETED`). |
 | **Unsuccessful Run Trace** | [`traces/unsuccessful_run.jsonl`](traces/unsuccessful_run.jsonl) – Step limit safeguard triggered (`status: STOPPED_MAX_STEPS`). |
 | **Active Latest Trace** | [`traces/trace.jsonl`](traces/trace.jsonl) – Most recent execution log. |
+
+---
+
+## 7. Stage 2: Tool Calling, Security Policy & MCP Servers
+
+### Overview
+In Stage 2, MacroTrack transitions from standalone hardcoded functions to an enterprise-grade agent architecture:
+1. **Three Tool Kinds:** Explicit classification into Read-Only, Reversible Write, and Sensitive operations.
+2. **Python Security Policy Gate (`policy.py`):** The Python application maintains full deterministic authority over what actually runs. The LLM cannot fake confirmation; sensitive operations physically invoke a human approval prompt (`[t/n]`).
+3. **Local MCP Servers:** Two independent MCP servers run over standard `stdio` without external databases or Docker:
+   - **Nutrition MCP Server (`src/agent_project/mcp_server.py`):** Reuses the exact nutrition functions (`lookup_food`, `read_log`, `log_meal`, `delete_meal`).
+   - **Fitness MCP Server (`src/agent_project/fitness_mcp_server.py`):** Calculates physical activity calorie burn using sports science MET formulas (`estimate_burned_calories`, `log_workout`, `get_daily_workouts`).
+4. **Multi-MCP Client Hub (`src/agent_project/mcp_client.py`):** Aggregates tools from both MCP servers and executes multi-tool goals.
+
+### Architecture Diagram (Model Request vs. Python Application Control)
+
+```mermaid
+flowchart TD
+    subgraph Model["Model Request Layer"]
+        LLM["Gemini Model (Agent Loop)"]
+    end
+
+    subgraph SecurityPolicy["Python Application Control Layer (policy.py)"]
+        AuthCheck{"1. Is Tool Allowed?"}
+        SchemaVal{"2. Pydantic Schema Valid?"}
+        RiskCheck{"3. Risk Classification"}
+        ConfirmGate{"4. Human Confirmation Gate<br/>(Interactive CLI Prompt [t/n])"}
+    end
+
+    subgraph Actions["Execution Layer"]
+        ReadOnlyAction["Execute Read-Only<br/>(e.g., lookup_food, read_log)"]
+        ReversibleWrite["Execute Reversible Write<br/>(e.g., log_meal_entry with meal_id)"]
+        SensitiveAction["Execute Sensitive Tool<br/>(e.g., delete_meal_entry)"]
+        AbortAction["Return confirmation_denied<br/>(Operation aborted safely)"]
+    end
+
+    subgraph MCPServers["Local MCP Servers (stdio transport)"]
+        NutrMCP["Nutrition MCP Server<br/>(mcp_server.py)"]
+        FitMCP["Fitness MCP Server<br/>(fitness_mcp_server.py)"]
+    end
+
+    LLM -->|"tool_call(fn, args)"| AuthCheck
+    AuthCheck -- "No" -->|"UNAUTHORIZED_TOOL"| LLM
+    AuthCheck -- "Yes" --> SchemaVal
+    SchemaVal -- "Invalid" -->|"VALIDATION_FAILED"| LLM
+    SchemaVal -- "Valid" --> RiskCheck
+
+    RiskCheck -->|"READ_ONLY"| ReadOnlyAction
+    RiskCheck -->|"REVERSIBLE_WRITE"| ReversibleWrite
+    RiskCheck -->|"SENSITIVE"| ConfirmGate
+
+    ConfirmGate -- "User: [n] (Denied)" --> AbortAction
+    ConfirmGate -- "User: [t/y] (Approved)" --> SensitiveAction
+
+    ReadOnlyAction --> NutrMCP
+    ReversibleWrite --> NutrMCP
+    SensitiveAction --> NutrMCP
+    FitMCP -.->|"estimate_burned_calories"| ReadOnlyAction
+
+    AbortAction -->|"status: confirmation_denied"| LLM
+    NutrMCP -->|"Observation (Result)"| LLM
+    FitMCP -->|"Observation (Result)"| LLM
+```
+
+### Three Kinds of Tools in MacroTrack
+
+| Tool Kind | Function Name | Risk Level | Required Control in Code |
+| :--- | :--- | :--- | :--- |
+| **Read-Only** | `lookup_local_food`<br>`read_daily_log`<br>`query_open_food_facts`<br>`estimate_burned_calories` | Zero side effects | Name check + Pydantic argument type validation. |
+| **Reversible Write** | `log_meal_entry`<br>`cache_food_item`<br>`log_workout`<br>`save_daily_log` | Modifies state, but reversible | State validation, generates unique `meal_id`/`workout_id` allowing rollback. |
+| **Sensitive** | `delete_meal_entry`<br>`clear_daily_log` | High risk / Destructive | **Human-in-the-Loop Confirmation Gate**: Execution is blocked until user explicitly confirms (`[t/n]`). |
+
+### Stage 2 Checkpoint Deliverables
+
+| Requirement | Implementation Details |
+| :--- | :--- |
+| **Three Typed Tools** | Defined with Pydantic in [`src/agent_project/tools.py`](src/agent_project/tools.py) and [`src/agent_project/policy.py`](src/agent_project/policy.py). |
+| **Security Control Layer** | [`src/agent_project/policy.py`](src/agent_project/policy.py) validates names, arguments, and prompts confirmation. |
+| **Local MCP Server** | [`src/agent_project/mcp_server.py`](src/agent_project/mcp_server.py) exposes tools over MCP without code duplication. |
+| **Secondary MCP Server (Fitness)** | [`src/agent_project/fitness_mcp_server.py`](src/agent_project/fitness_mcp_server.py) provides MET calorie calculations. |
+| **Deterministic Tests** | 17 unit tests in [`tests/test_agent.py`](tests/test_agent.py) and [`tests/test_stage2.py`](tests/test_stage2.py) (`17 passed in 1.56s`). |
+| **Trace: Confirmation Denied** | [`traces/stage2_confirmation_denied.jsonl`](traces/stage2_confirmation_denied.jsonl) – Model attempts meal deletion, user denies, model adapts and preserves state. |
+| **Trace: Confirmation Approved** | [`traces/stage2_confirmation_approved.jsonl`](traces/stage2_confirmation_approved.jsonl) – User approves deletion, meal is removed, totals recalculated. |
+| **Trace: Multi-MCP Run** | [`traces/stage2_multi_mcp_run.jsonl`](traces/stage2_multi_mcp_run.jsonl) – Agent queries Fitness MCP + Nutrition MCP to compute net daily balance. |
